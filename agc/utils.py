@@ -1,7 +1,16 @@
 import numpy as np
 
 
-def fft2melmx(nfft, sr=8000., nfilts=None, width=1., minfrq=0., maxfrq=None, htkmel=False, constamp=False):
+def fft2melmx(
+    nfft,
+    sr=8000.0,
+    nfilts=None,
+    width=1.0,
+    minfrq=0.0,
+    maxfrq=None,
+    htkmel=False,
+    constamp=False,
+):
     """
     Generate a matrix of weights to combine FFT bins into Mel
     bins.  nfft defines the source FFT size at sampling rate sr.
@@ -21,10 +30,10 @@ def fft2melmx(nfft, sr=8000., nfilts=None, width=1., minfrq=0., maxfrq=None, htk
     """
 
     if maxfrq is None:
-        maxfrq = sr / 2.
+        maxfrq = sr / 2.0
 
     if nfilts is None:
-        nfilts = int(np.ceil(hz2mel(maxfrq, htkmel) / 2.))
+        nfilts = int(np.ceil(hz2mel(maxfrq, htkmel) / 2.0))
 
     wts = np.zeros((nfilts, nfft))
 
@@ -34,7 +43,10 @@ def fft2melmx(nfft, sr=8000., nfilts=None, width=1., minfrq=0., maxfrq=None, htk
     # 'Center freqs' of mel bands - uniformly spaced between limits
     minmel = hz2mel(minfrq, htkmel)
     maxmel = hz2mel(maxfrq, htkmel)
-    binfrqs = mel2hz(minmel + np.arange(nfilts + 2, dtype=float) / (nfilts + 1) * (maxmel - minmel), htkmel)
+    binfrqs = mel2hz(
+        minmel + np.arange(nfilts + 2, dtype=float) / (nfilts + 1) * (maxmel - minmel),
+        htkmel,
+    )
 
     # binbin = round(binfrqs / sr * (nfft - 1))
 
@@ -46,14 +58,14 @@ def fft2melmx(nfft, sr=8000., nfilts=None, width=1., minfrq=0., maxfrq=None, htk
         loslope = (fftfrqs - fs[0]) / (fs[1] - fs[0])
         hislope = (fs[2] - fftfrqs) / (fs[2] - fs[1])
         # .. then intersect them with each other and zero
-        wts[i, :nfft / 2 + 1] = np.maximum(0, np.minimum(loslope, hislope))
+        wts[i, : int(nfft / 2) + 1] = np.maximum(0, np.minimum(loslope, hislope))
 
     if not constamp:
         # Slaney-style mel is scaled to be approx constant E per channel
-        wts = np.dot(np.diag(2. / (binfrqs[2:nfilts + 2] - binfrqs[:nfilts])), wts)
+        wts = np.dot(np.diag(2.0 / (binfrqs[2 : nfilts + 2] - binfrqs[:nfilts])), wts)
 
     # Make sure 2nd half of FFT is zero
-    wts[:, (nfft / 2 + 2):] = 0
+    wts[:, int(nfft / 2 + 2) :] = 0
     # seems like a good idea to avoid aliasing
 
     return (wts, binfrqs)
@@ -66,20 +78,26 @@ def mel2hz(z, htk=False):
     """
 
     if htk:
-        f = 700. * (10. ** (z / 2595.) - 1)
+        f = 700.0 * (10.0 ** (z / 2595.0) - 1)
     else:
         f_0 = 0  # 133.33333
-        f_sp = 200. / 3.  # 66.66667
-        brkfrq = 1000.
+        f_sp = 200.0 / 3.0  # 66.66667
+        brkfrq = 1000.0
         brkpt = (brkfrq - f_0) / f_sp  # starting mel value for log region
-        logstep = np.exp(np.log(6.4) / 27.)  # the magic 1.0711703 which is the ratio needed to get from 1000 Hz to 6400 Hz in 27 steps, and is *almost* the ratio between 1000 Hz and the preceding linear filter center at 933.33333 Hz (actually 1000/933.33333 = 1.07142857142857 and  exp(log(6.4)/27) = 1.07117028749447)
+        logstep = np.exp(
+            np.log(6.4) / 27.0
+        )  # the magic 1.0711703 which is the ratio needed to get from 1000 Hz to 6400 Hz in 27 steps, and is *almost* the ratio between 1000 Hz and the preceding linear filter center at 933.33333 Hz (actually 1000/933.33333 = 1.07142857142857 and  exp(log(6.4)/27) = 1.07117028749447)
 
-        linpts = (z < brkpt)
+        linpts = z < brkpt
 
         f = 0 * z
 
         if np.isscalar(z):
-            f = f_0 + f_sp * z if linpts else brkfrq * np.exp(np.log(logstep) * (z - brkpt))
+            f = (
+                f_0 + f_sp * z
+                if linpts
+                else brkfrq * np.exp(np.log(logstep) * (z - brkpt))
+            )
         else:
             # fill in parts separately
             f[linpts] = f_0 + f_sp * z[linpts]
@@ -95,21 +113,27 @@ def hz2mel(f, htk=False):
     """
 
     if htk:
-        z = 2595. * np.log10(1. + f / 700.)
+        z = 2595.0 * np.log10(1.0 + f / 700.0)
     else:
         # pass
         f_0 = 0  # 133.33333;
-        f_sp = 200. / 3.  # 66.66667;
-        brkfrq = 1000.
+        f_sp = 200.0 / 3.0  # 66.66667;
+        brkfrq = 1000.0
         brkpt = (brkfrq - f_0) / f_sp  # starting mel value for log region
-        logstep = np.exp(np.log(6.4) / 27.)  # the magic 1.0711703 which is the ratio needed to get from 1000 Hz to 6400 Hz in 27 steps, and is *almost* the ratio between 1000 Hz and the preceding linear filter center at 933.33333 Hz (actually 1000/933.33333 = 1.07142857142857 and  exp(log(6.4)/27) = 1.07117028749447)
+        logstep = np.exp(
+            np.log(6.4) / 27.0
+        )  # the magic 1.0711703 which is the ratio needed to get from 1000 Hz to 6400 Hz in 27 steps, and is *almost* the ratio between 1000 Hz and the preceding linear filter center at 933.33333 Hz (actually 1000/933.33333 = 1.07142857142857 and  exp(log(6.4)/27) = 1.07117028749447)
 
-        linpts = (f < brkfrq)
+        linpts = f < brkfrq
 
         z = 0 * f
 
         if np.isscalar(f):
-            z = (f - f_0) / f_sp if linpts else brkpt + (np.log(f / brkfrq)) / np.log(logstep)
+            z = (
+                (f - f_0) / f_sp
+                if linpts
+                else brkpt + (np.log(f / brkfrq)) / np.log(logstep)
+            )
         else:
             # fill in parts separately
             z[linpts] = (f[linpts] - f_0) / f_sp
@@ -118,15 +142,13 @@ def hz2mel(f, htk=False):
     return z
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     from scipy.io import savemat
+
     for i in (5, 6, 7):
-        n = 2 ** i
+        n = 2**i
         wts, binfrqs = fft2melmx(n)
-        savemat('../f2m%d.mat' % (n,), {'wts': wts, 'binfrqs': binfrqs})
-
-
+        savemat("../f2m%d.mat" % (n,), {"wts": wts, "binfrqs": binfrqs})
 
 
 # Testing values

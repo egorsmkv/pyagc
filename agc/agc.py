@@ -1,12 +1,12 @@
-"""Implements Automatic Gain Control (AGC) for audio signals,
-as described in http://labrosa.ee.columbia.edu/matlab/tf_agc/
+"""
+Implements Automatic Gain Control (AGC) for audio signals, as described in http://labrosa.ee.columbia.edu/matlab/tf_agc/
 """
 
 import numpy as np
 import scipy.signal as signal
 
-from utils import fft2melmx
-from stft import stft, istft
+from .utils import fft2melmx
+from .stft import stft, istft
 
 
 def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
@@ -27,9 +27,9 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
     hop_size = 0.032  # in seconds
 
     # Make STFT on ~32 ms grid
-    ftlen = int(2 ** np.round(np.log(hop_size * sr) / np.log(2.)))
+    ftlen = int(2 ** np.round(np.log(hop_size * sr) / np.log(2.0)))
     winlen = ftlen
-    hoplen = winlen / 2
+    hoplen = int(winlen / 2)
     D = stft(d, winlen, hoplen)  # using my code
     ftsr = sr / hoplen
     ndcols = D.shape[1]
@@ -40,7 +40,7 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
     nbands = max(10, 20 / f_scale)  # 10 bands, or more for very fine f_scale
     mwidth = f_scale * nbands / 10  # will be 2.0 for small f_scale
     (f2a_tmp, _) = fft2melmx(ftlen, sr, int(nbands), mwidth)
-    f2a = f2a_tmp[:, :ftlen / 2 + 1]
+    f2a = f2a_tmp[:, : int(ftlen / 2) + 1]
     audgram = np.dot(f2a, np.abs(D))
 
     if causal_tracking:
@@ -48,7 +48,7 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
         fbg = np.zeros(audgram.shape)
         # state = zeros(size(audgram,1),1);
         state = np.zeros(audgram.shape[0])
-        alpha = np.exp(-(1. / ftsr) / t_scale)
+        alpha = np.exp(-(1.0 / ftsr) / t_scale)
         for i in range(audgram.shape[1]):
             state = np.maximum(alpha * state, audgram[:, i])
             fbg[:, i] = state
@@ -62,10 +62,14 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
 
         # reflect ends to get smooth stuff
         AD = audgram
-        x = np.hstack((np.fliplr(AD[:, :htlen]),
-                       AD,
-                       np.fliplr(AD[:, -htlen:]),
-                       np.zeros((AD.shape[0], htlen))))
+        x = np.hstack(
+            (
+                np.fliplr(AD[:, :htlen]),
+                AD,
+                np.fliplr(AD[:, -htlen:]),
+                np.zeros((AD.shape[0], htlen)),
+            )
+        )
         fbg = signal.lfilter(twin, 1, x, 1)
 
         # strip "warm up" points
@@ -74,8 +78,8 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
     # map back to FFT grid, flatten bark loop gain
     sf2a = np.sum(f2a, 0)
     sf2a_fix = sf2a
-    sf2a_fix[sf2a == 0] = 1.
-    E = np.dot(np.dot(np.diag(1. / sf2a_fix), f2a.T), fbg)
+    sf2a_fix[sf2a == 0] = 1.0
+    E = np.dot(np.dot(np.diag(1.0 / sf2a_fix), f2a.T), fbg)
     # Remove any zeros in E (shouldn't be any, but who knows?)
     E[E <= 0] = np.min(E[E > 0])
 
@@ -85,16 +89,17 @@ def tf_agc(d, sr, t_scale=0.5, f_scale=1.0, causal_tracking=True, plot=False):
     if plot:
         try:
             import matplotlib.pyplot as plt
+
             plt.subplot(3, 1, 1)
-            plt.imshow(20. * np.log10(np.flipud(np.abs(D))))
+            plt.imshow(20.0 * np.log10(np.flipud(np.abs(D))))
             plt.subplot(3, 1, 2)
-            plt.imshow(20. * np.log10(np.flipud(np.abs(E))))
+            plt.imshow(20.0 * np.log10(np.flipud(np.abs(E))))
             A = stft(y, winlen, hoplen)  # using my code
             plt.subplot(3, 1, 3)
-            plt.imshow(20. * np.log10(np.flipud(np.abs(A))))
+            plt.imshow(20.0 * np.log10(np.flipud(np.abs(A))))
             plt.show()
-        except Exception, e:
-            print "Failed to plot results"
-            print e
+        except Exception as e:
+            print("Failed to plot results")
+            print(e)
 
     return (y, D, E)
