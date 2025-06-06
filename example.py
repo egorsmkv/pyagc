@@ -1,6 +1,6 @@
 import scipy.io.wavfile
 import numpy as np
-from agc.agc import tf_agc
+from agc import tf_agc
 
 if __name__ == "__main__":
     # read audiofile
@@ -11,7 +11,7 @@ if __name__ == "__main__":
     d = d / (convert_16_bit + 1.0)
 
     # apply AGC
-    (y, D, E) = tf_agc(d, sr, plot=True)
+    (y, D, E) = tf_agc(d, sr)
 
     # convert back to int16 to save
     y = np.int16(y / np.max(np.abs(y)) * convert_16_bit)
